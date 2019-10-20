@@ -17,6 +17,7 @@ class ModalLinearRegression(object):
         self.bandwidth = bandwidth
         self.maxitr = maxitr
         self.coef_ = None
+        self.intercept_ = None
 
     def kernel(self, x, y):
         assert self.kernel_type in {'gaussian', 'linear', 'exponential'}, "Invalid Kernel"
@@ -35,6 +36,13 @@ class ModalLinearRegression(object):
             w = self.M(X, y, w1)
         self.coef_ = w[:-1]
         self.intercept_ = w[-1]
+
+    def predict(self, x):
+        assert (self.coef_ is not None) and (self.intercept_ is not None), "fit model first"
+        n, _ = x.shape
+        w = np.hstack([self.coef_, self.intercept_])
+        X = np.hstack([x, np.ones(n).reshape(-1, 1)])  # insert bias
+        return np.dot(X, w)
 
     def E(self, X, y, w):
         if w is None:
@@ -61,4 +69,5 @@ if __name__ == "__main__":
     print(lr.coef_, lr.intercept_)
     mr = ModalLinearRegression()
     mr.fit(X, y)
+    print(mr.predict(X).shape)
     print(mr.coef_, mr.intercept_)
