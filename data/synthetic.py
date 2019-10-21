@@ -24,7 +24,16 @@ def data1(n):
     return x, y, U
 
 
+def data2():
+    train_X = np.load('data/q3_train_X.npy')
+    train_y = np.load('data/q3_train_y.npy')
+    print(train_X.shape, train_y.shape)
+    return train_X, train_y
+
+
 if __name__ == "__main__":
     X, y, U = data1(500)
     sns.scatterplot(X, y, hue=U)
-    plt.show()
+    # plt.show()
+    data2()
+

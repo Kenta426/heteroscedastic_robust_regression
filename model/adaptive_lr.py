@@ -29,7 +29,7 @@ class Poly2RegressionModel(torch.nn.Module):
 
 
 class AdaptiveRegression(object):
-    def __init__(self, base_model='linear', epoch=1000):
+    def __init__(self, base_model='linear', epoch=1000, lr=0.01):
         assert base_model in {'linear', 'polynomial'}, "Invalid base model"
         self.base_model = base_model
         self.epoch = epoch
@@ -38,6 +38,7 @@ class AdaptiveRegression(object):
         self.alpha = None
         self.scale = None
         self.base = None
+        self.lr = lr
 
     def fit(self, X, y):
         n, dim = X.shape
@@ -50,7 +51,7 @@ class AdaptiveRegression(object):
         X = torch.Tensor(X)
         y = torch.Tensor(y)
         params = list(base.parameters()) + list(adaptive.parameters())
-        optimizer = torch.optim.Adam(params, lr=0.01)
+        optimizer = torch.optim.Adam(params, lr=self.lr)
 
         for _ in tqdm(range(self.epoch)):
             y_i = base(X).squeeze()

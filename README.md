@@ -18,3 +18,7 @@ Modal Regression *might* become identical to adaptive loss but modal regression 
 2. the bandwidth parameter needs to be calibrated carefully. Decision boundary is very sensitive to 
 this parameter. ModalLR might become essentially identical to LR or adaptive LR based on this parameter.
 ![](./fig/comparison.png)
+
+## Observation 3
+Synthetic data from HW1. Modal regression with h = 10, Adaptive Regression with learning rate = 0.05, epoch = 1000.
+![](./fig/comparison2.png)

@@ -6,7 +6,7 @@
 5. check bias/variance trade-off
 6. (optional) plot lines
 """
-from data.synthetic import data1
+from data.synthetic import data1, data2
 from model.modal_lr import ModalLinearRegression
 from model.adaptive_lr import AdaptiveRegression
 from sklearn.linear_model import LinearRegression
@@ -23,19 +23,20 @@ def main():
         cfg = yaml.load(ymlfile)
     # step 1
     n = cfg['data']['n']
-    x, y, u = data1(n=n)
-    x = x.reshape(n, -1)
+    # x, y, u = data1()
+    #     # x = x.reshape(n, -1)
+    x, y = data2()
 
     # step 2
     lr = LinearRegression()
     lr.fit(x, y)
 
     # step 3
-    ml = ModalLinearRegression(bandwidth=0.3, maxitr=500)  # seems very important to calibrate bandwidth
+    ml = ModalLinearRegression(bandwidth=10, maxitr=500)  # seems very important to calibrate bandwidth
     ml.fit(x, y)
 
     # step 4
-    ada_lr = AdaptiveRegression()
+    ada_lr = AdaptiveRegression(lr=0.05, epoch=1000)
     ada_lr.fit(x, y)
 
     # step 5
@@ -55,8 +56,8 @@ def main():
 
     # step 6
     if cfg['plot']:
-        sns.scatterplot(x.flatten(), y, hue=u)
-        x_plot = np.linspace(0, 1, 100)  # hacky (I know the range of X is [0,1])
+        sns.scatterplot(x.flatten(), y)
+        x_plot = np.linspace(x.min(), x.max(), 100)  # hacky (I know the range of X is [0,1])
         y_plot_ml = ml.predict(x_plot.reshape(100, -1))
         y_plot_alr = ada_lr.predict(x_plot.reshape(100, -1))
         y_plot_lr = lr.predict(x_plot.reshape(100, -1))
@@ -64,8 +65,9 @@ def main():
         plt.plot(x_plot, y_plot_ml, color='navy', label='Modal Regression')
         plt.plot(x_plot, y_plot_alr, color='darkgreen', label='Adaptive Regression')
         plt.legend()
-        # plt.savefig('fig/comparison.png')
+        # plt.savefig('fig/comparison2.png')
         plt.show()
+
 
 if __name__ == '__main__':
     main()
