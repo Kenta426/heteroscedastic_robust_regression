@@ -1,24 +1,17 @@
-# Robust Adaptive Loss for Mixed Distribution
+# Semi-parametric Learning for Heteroscedastic Robust Regression 
 
-## Directory
-- `main.py`: run experiment
-- `data`: synthetic data generating process goes here
-- `model`: Code for models goes here. Currently, adaptive lr (`model/adaptive_lr.py`) and modal lr (`model/modal_lr.py`)are implemented 
-- `config.yml`: set configuration for the experiment
-## Observation 1
-Input data is partitioned according to Bern(p=0.5).
-One group follows polynomial and another follows linear DGP. Although data is 50/50 split into two sub-groups
-the Adaptive loss fits better to linear data (... why?)
-![](./fig/table.png)
-
-
-## Observation 2
-Modal Regression *might* become identical to adaptive loss but modal regression has several parametric assumptions:
-1. choice of kernel (In order to use the closed form, kernel has to be Gaussian)
-2. the bandwidth parameter needs to be calibrated carefully. Decision boundary is very sensitive to 
-this parameter. ModalLR might become essentially identical to LR or adaptive LR based on this parameter.
-![](./fig/comparison.png)
-
-## Observation 3
-Synthetic data from HW1. Modal regression with h = 10, Adaptive Regression with learning rate = 0.05, epoch = 1000.
-![](./fig/comparison2.png)
+## General Framework
+1. Given noisy data X, we first optimize 2xN free parameters for alpha and c
+    - TODO: Experiment with different training schemes
+        - N alpha, 1 c
+        - 1 alpha, N c
+        - N alpha, N c
+        - EM-like procedure where we update alternatively
+2. Fit models for alpha and c (this process works somewhat like a regularization)
+    - Based on prior knowledge about heteroscedasticity, we decide either parametric models or non-parametric models for alpha and c
+        - TODO: show trade-off (model misspecification vs variance)
+        - TODO: 3 baseline cases: GLM (exponential), Spline GLM, and non-parametric
+3. Simulate posterior with MCMC using the general robust kernel but locally differentiating parameters for alpha from 2
+    - If alpha and c is from non-parametric model in the previous step, we sample recursively
+    - Otherwise we simulate Q(y|x) = P(y|x, alpha(x)) <- since we can easily get Q(y|x), this becomes regular posterior estimate.
+ 
