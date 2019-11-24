@@ -7,6 +7,8 @@
         - 1 alpha, N c
         - N alpha, N c
         - EM-like procedure where we update alternatively
+    - TODO: When input covariate is more than 1-D, we need to figure out the best choice for "naive" regression
+        - We could replace with sample mean
 2. Fit models for alpha and c (this process works somewhat like a regularization)
     - Based on prior knowledge about heteroscedasticity, we decide either parametric models or non-parametric models for alpha and c
         - TODO: show trade-off (model misspecification vs variance)
