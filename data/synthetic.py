@@ -67,6 +67,48 @@ def generate_delta_noise(n: int, x_range: list, delta=10, rate=0.01, beta1=3, be
     return X, Y, noise
 
 
+def generate_data_function(base_func, noise_func, n, test_data = 0.2, rate=0.01, loc=[2,5], y=15):
+    """
+    n : number of data to generate
+    rate : rate of outliers (set 0 if you don't want outlier)
+    loc : mean location on x-axis for outliers
+    y : mean for outliers
+
+    return
+    X : x-coordinate
+    output : y-coordinate from noise less model
+    Y : noisy output
+    """
+    # base data
+    X = npr.uniform(-5, 5, n)
+    output = base_func(X)
+    noise = noise_func(X)
+    Y = output+noise
+
+    trainX = X[:int(n*(1-test_data))]
+    testX = X[int(n*(1-test_data)):]
+    trainY = Y[:int(n*(1-test_data))]
+    testY = Y[int(n*(1-test_data)):]
+
+    # generate outliers
+    if not isinstance(loc, list):
+        loc = [loc]
+    out = int(n*(1-test_data)*rate/len(loc))
+    Xout = []
+    Yout = []
+    for l in loc:
+        out_data = npr.multivariate_normal([0,0], [[0.03,0],[0,0.5]], out)
+        out_x = out_data[:, 0]+l
+        out_y = out_data[:, 1]+y
+        Xout.append(out_x)
+        Yout.append(out_y)
+    Xout = np.hstack(Xout)
+    Yout = np.hstack(Yout)
+    trainX = np.hstack([trainX, Xout])
+    trainY = np.hstack([trainY, Yout])
+    return trainX, trainY, testX, testY
+
+
 if __name__ == "__main__":
     X, y, U = data3(500)
     sns.scatterplot(X, y, hue=U)
