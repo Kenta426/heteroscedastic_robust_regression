@@ -67,7 +67,7 @@ def generate_delta_noise(n: int, x_range: list, delta=10, rate=0.01, beta1=3, be
     return X, Y, noise
 
 
-def generate_data_function(base_func, noise_func, n, test_data = 0.2, rate=0.01, loc=[2,5], y=15):
+def generate_data_function(base_func, noise_func, n, test_data = 0.2, rate=0.01, loc=[2,5], yloc=[15, 15]):
     """
     n : number of data to generate
     rate : rate of outliers (set 0 if you don't want outlier)
@@ -93,13 +93,16 @@ def generate_data_function(base_func, noise_func, n, test_data = 0.2, rate=0.01,
     # generate outliers
     if not isinstance(loc, list):
         loc = [loc]
+    if not isinstance(yloc, list):
+        yloc = [yloc]
+    assert len(yloc) == len(loc), 'location of outliers must match'
     out = int(n*(1-test_data)*rate/len(loc))
     Xout = []
     Yout = []
-    for l in loc:
+    for l, yl in zip(loc, yloc):
         out_data = npr.multivariate_normal([0,0], [[0.03,0],[0,0.5]], out)
         out_x = out_data[:, 0]+l
-        out_y = out_data[:, 1]+y
+        out_y = out_data[:, 1]+yl
         Xout.append(out_x)
         Yout.append(out_y)
     Xout = np.hstack(Xout)
