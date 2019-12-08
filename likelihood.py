@@ -56,3 +56,52 @@ class Adaptive(object):
             log_partition = log_partition.sum()
         nll = loss + log_partition
         return -nll.detach().numpy()
+
+    def sample(self, alpha, c):
+        alpha = torch.as_tensor(alpha)
+        scale = torch.as_tensor(c)
+        assert (alpha >= 0).all()
+        assert (scale >= 0).all()
+        float_dtype = alpha.dtype
+        assert scale.dtype == float_dtype
+
+        cauchy = torch.distributions.cauchy.Cauchy(0., np.sqrt(2.))
+        uniform = torch.distributions.uniform.Uniform(0, 1)
+        samples = torch.zeros_like(alpha)
+        accepted = torch.zeros(alpha.shape).type(torch.bool)
+        dist = distribution.Distribution()
+        while not accepted.type(torch.uint8).all():
+            # Draw N samples from a Cauchy, our proposal distribution.
+            cauchy_sample = torch.reshape(
+              cauchy.sample((np.prod(alpha.shape),)), alpha.shape)
+            cauchy_sample = cauchy_sample.type(alpha.dtype)
+
+            # Compute the likelihood of each sample under its target distribution.
+            nll = dist.nllfun(cauchy_sample,
+                            torch.as_tensor(alpha).to(cauchy_sample),
+                            torch.tensor(1).to(cauchy_sample))
+
+            # Bound the NLL. We don't use the approximate loss as it may cause
+            # unpredictable behavior in the context of sampling.
+            nll_bound = general.lossfun(
+              cauchy_sample,
+              torch.tensor(0., dtype=cauchy_sample.dtype),
+              torch.tensor(1., dtype=cauchy_sample.dtype),
+              approximate=False) + dist.log_base_partition_function(alpha)
+
+            # Draw N samples from a uniform distribution, and use each uniform sample
+            # to decide whether or not to accept each proposal sample.
+            uniform_sample = torch.reshape(
+              uniform.sample((np.prod(alpha.shape),)), alpha.shape)
+            uniform_sample = uniform_sample.type(alpha.dtype)
+            accept = uniform_sample <= torch.exp(nll_bound - nll)
+
+            # If a sample is accepted, replace its element in `samples` with the
+            # proposal sample, and set its bit in `accepted` to True.
+            samples = torch.where(accept, cauchy_sample, samples)
+            accepted = accepted | accept
+
+            # Because our distribution is a location-scale family, we sample from
+            # p(x | 0, \alpha, 1) and then scale each sample by `scale`.
+            samples *= scale
+        return samples
