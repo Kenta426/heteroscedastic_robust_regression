@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 
 class ModalLinearRegression(object):
-    def __init__(self, kernel='gaussian', bandwidth=1, maxitr=100):
+    def __init__(self, kernel='gaussian', bandwidth=1, maxitr=100, poly=1):
         """
         :param w_dim: dimension of input covariates
         :param kernel: type of kernel
@@ -18,6 +18,7 @@ class ModalLinearRegression(object):
         self.maxitr = maxitr
         self.coef_ = None
         self.intercept_ = None
+        self.poly = poly
 
     def kernel(self, x, y):
         assert self.kernel_type in {'gaussian', 'linear', 'exponential'}, "Invalid Kernel"
@@ -28,8 +29,9 @@ class ModalLinearRegression(object):
 
     def fit(self, x, y):
         n, dim = x.shape
+        x = np.hstack([x**(i+1) for i in range(self.poly)])
         X = np.hstack([x, np.ones(n).reshape(-1, 1)])  # insert bias
-        w = np.zeros([dim+1])
+        w = np.zeros([self.poly*dim+1])
         print('Fit with the EM algorithm')
         for _ in tqdm(range(self.maxitr)):
             w1 = self.E(X, y, w)
@@ -40,7 +42,9 @@ class ModalLinearRegression(object):
     def predict(self, x):
         assert (self.coef_ is not None) and (self.intercept_ is not None), "fit model first"
         n, _ = x.shape
+        print(self.coef_.shape, self.intercept_.shape)
         w = np.hstack([self.coef_, self.intercept_])
+        x = np.hstack([x ** (i + 1) for i in range(self.poly)])
         X = np.hstack([x, np.ones(n).reshape(-1, 1)])  # insert bias
         return np.dot(X, w)
 
@@ -67,7 +71,7 @@ if __name__ == "__main__":
     lr = LinearRegression()
     lr.fit(X, y)
     print(lr.coef_, lr.intercept_)
-    mr = ModalLinearRegression()
+    mr = ModalLinearRegression(poly=2)
     mr.fit(X, y)
     print(mr.predict(X).shape)
     print(mr.coef_, mr.intercept_)
