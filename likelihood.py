@@ -45,9 +45,14 @@ class Laplace(object):
 
 class Adaptive(object):
     def loglikelihood(self, res, alpha, scale):
+        assert alpha.view(-1).size()[0] == 1 or alpha.view(-1).size()[0] == len(res)
         N = len(res)
         dist = distribution.Distribution()
         loss = general.lossfun(res, alpha, scale, approximate=False).sum()
         log_partition = torch.log(scale) + dist.log_base_partition_function(alpha)
-        nll = loss + N*log_partition
+        if alpha.view(-1).size()[0] == 1:
+            log_partition = N*log_partition
+        else:
+            log_partition = log_partition.sum()
+        nll = loss + log_partition
         return -nll.detach().numpy()
