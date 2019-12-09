@@ -18,10 +18,10 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 if __name__ == '__main__':
     def indep_noise(x):
-        return npr.normal(0, 0.5, len(x))
+        return npr.normal(0, 1, len(x))
 
     def linear_noise(x):
-        return npr.normal(0, np.maximum(1,x), len(x))
+        return npr.normal(0, np.maximum(1, x), len(x))
 
     def exp_noise(x):
         return npr.normal(0, np.exp(1/3*x), len(x))
@@ -29,8 +29,17 @@ if __name__ == '__main__':
     def output_func(x):
         return 1 / 5 * x ** 2
 
+    def complex_noise(x):
+        return npr.normal(0,1, len(x))*np.abs(np.abs(x+2)-2)/1.5
+
+    def complex_noise2(x):
+        return npr.normal(0,1, len(x))*1/(np.maximum(np.abs(x), 0.3))
+
+    def complex_noise3(x):
+        return npr.normal(0,1, len(x))*(np.sin((x-5))*0.8)
+
     n = 500
-    trX, trY, teX, teY = generate_data_function(output_func, linear_noise, n, rate=0.1, loc=[-3, -2], yloc=[50, 30])
+    trX, trY, teX, teY = generate_data_function(output_func, complex_noise3, n, rate=0.1, loc=[-3, -2], yloc=[50, 30])
 
     x, y = torch.Tensor(trX), torch.Tensor(trY)
     gaussian = Gaussian()
@@ -100,10 +109,10 @@ if __name__ == '__main__':
 
     # # sample from learned distribution
     data = []
-    for _ in tqdm(range(500)):
+    for _ in tqdm(range(1000)):
         data.append(adaptive.sample(alphas, scales).detach().numpy().reshape(-1, 1))
     stds = []
-    burn = 5
+    burn = 3
     for i in range(len(alphas)):
         std = (np.sort(np.hstack(data)[i, :])[burn:-burn]).std()
         stds.append(std)
