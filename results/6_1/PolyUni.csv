@@ -1,0 +1,6 @@
+,likelihood,model
+0,-1057.3399906286033,LR+2
+1,-419.5249580695513,RobustLR+2
+2,-940.3507,Adaptive+2
+3,-147.15567,LocalAdaptive+2
+4,-774.21423,GPR
