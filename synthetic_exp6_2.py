@@ -171,10 +171,14 @@ if __name__ == '__main__':
     output = [polynomial_outcome, sinusoidal_outcome]
     for i in range(len(Y_name)):
         for j in range(len(n_name)):
-            trX, trY, teX, teY = generate_data_function(output[i], noise[j], n, rate=0.1, loc=[-2], yloc=[10])
-            if i == 0:
-                degree = 2
-            else:
-                degree = 5
-            df = run_experiment(trX, trY, teX, teY, degree)
-            df.to_csv('results/6_2/'+Y_name[i]+n_name[j]+'Outlier.csv')
+            dfs = []
+            for k in range(5):
+                trX, trY, teX, teY = generate_data_function(output[i], noise[j], n, rate=0.1, loc=[-2], yloc=[10])
+                if i == 0:
+                    degree = 2
+                else:
+                    degree = 5
+                df = run_experiment(trX, trY, teX, teY, degree)
+                df['rep'] = k
+                dfs.append(df)
+            pd.concat(dfs).to_csv('results/6_2/'+Y_name[i]+n_name[j]+'Outlier.csv')

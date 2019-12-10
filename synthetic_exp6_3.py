@@ -126,8 +126,12 @@ if __name__ == '__main__':
     for n in [50, 100, 300, 500, 1000, 3000, 5000, 10000]:
         for i in range(len(Y_name)):
             for j in range(len(n_name)):
-                trX, trY, _, _ = generate_data_function(output[i], noise[j], n, rate=0.1, loc=[-2], yloc=[10])
-                _, _, teX, teY = generate_data_function(output[i], noise[j], 500, rate=0.1, loc=[-2], yloc=[10])
+                dfs = []
+                for r in range(5):
+                    trX, trY, _, _ = generate_data_function(output[i], noise[j], n, rate=0.1, loc=[-2], yloc=[10])
+                    _, _, teX, teY = generate_data_function(output[i], noise[j], 500, rate=0.1, loc=[-2], yloc=[10])
 
-                df = run_experiment(trX, trY, teX, teY, 2)
-                df.to_csv('results/6_3/'+Y_name[i]+n_name[j]+str(n)+'Outlier.csv')
+                    df = run_experiment(trX, trY, teX, teY, 2)
+                    df['rep'] = r
+                    dfs.append(df)
+                pd.concat(dfs).to_csv('results/6_3/'+Y_name[i]+n_name[j]+str(n)+'Outlier.csv')

@@ -101,7 +101,7 @@ def run_experiment(trX,trY, teX, teY, degree=2, degree2=2):
     alpha_model = PolyRegression(degree2, init_zeros=True)
     scale_model = PolyRegression(degree2, init_zeros=True)
     fit, alpha_reg, scale_reg = train_locally_adaptive(lr, alpha_model, scale_model, x, y,
-                                                       epoch=300, learning_rate=5e-3, verbose=False)
+                                                       epoch=200, learning_rate=1e-2, verbose=False)
     res = fit(sortedx).view(-1) - sortedy
     alphas = torch.exp(alpha_reg(sortedx).view(-1))
     scales = torch.exp(scale_reg(sortedx).view(-1))
@@ -126,11 +126,20 @@ if __name__ == '__main__':
     for d in [1,2,3,4,5,6]:
         for i in range(len(Y_name)):
             for j in range(len(n_name)):
-                trX, trY, teX, teY = generate_data_function(output[i], noise[j], 1000, rate=0.1, loc=[-2], yloc=[10])
+                df_n = []
+                df_b = []
+                for r in range(5):
+                    trX, trY, teX, teY = generate_data_function(output[i], noise[j], 1000, rate=0.1, loc=[-2], yloc=[10])
 
-                df = run_experiment(trX, trY, teX, teY, degree=d)
-                df.to_csv('results/6_4/'+Y_name[i]+n_name[j]+'base'+str(d)+'Outlier.csv')
+                    df = run_experiment(trX, trY, teX, teY, degree=d)
+                    df['rep'] = r
+                    df_b.append(df)
 
-                if d < 4:
-                    df = run_experiment(trX, trY, teX, teY, degree2=d)
-                    df.to_csv('results/6_4/'+Y_name[i]+n_name[j]+'noise'+str(d)+'Outlier.csv')
+                    if d < 4:
+                        df = run_experiment(trX, trY, teX, teY, degree2=d)
+                        df['rep'] = r
+                        df_n.append(df)
+
+                pd.concat(df_b).to_csv('results/6_4/' + Y_name[i] + n_name[j] + 'base' + str(d) + 'Outlier.csv')
+                if len(df_n) != 0:
+                    pd.concat(df_n).to_csv('results/6_4/'+Y_name[i]+n_name[j]+'noise'+str(d)+'Outlier.csv')
