@@ -46,7 +46,7 @@ class Laplace(object):
 class Adaptive(object):
     def loglikelihood(self, res, alpha, scale):
         assert alpha.view(-1).size()[0] == 1 or alpha.view(-1).size()[0] == len(res)
-        scale = scale + 1e-8
+        scale = scale + 1e-5
         N = len(res)
         dist = distribution.Distribution()
         loss = general.lossfun(res, alpha, scale, approximate=False).sum()

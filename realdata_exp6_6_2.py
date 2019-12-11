@@ -14,6 +14,8 @@ from likelihood import Gaussian, Laplace, Adaptive
 from tqdm import tqdm
 import gpytorch
 import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold
 plt.style.use('ggplot')
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
@@ -61,34 +63,32 @@ def sinusoidal_outcome(X):
     return 1 / 5 * X ** 2 + 2 * np.sin(2 * X) - 0.5 * X
 
 
-def run_experiment(trX,trY, teX, teY, degree=2):
+def run_experiment(trX, trY, teX, teY, degree=2, degree2=2):
     x, y = torch.Tensor(trX), torch.Tensor(trY)
     tx, ty = torch.Tensor(teX), torch.Tensor(teY)
-    sortedx, idxX = torch.sort(x)
-    sortedy = y[idxX]
+    sortedx, idxX = torch.sort(tx)
+    sortedy = ty[idxX]
 
+    adaptive = Adaptive()
     gaussian = Gaussian()
     laplace = Laplace()
-    adaptive = Adaptive()
 
     # linear regression
     stats = []
-
     lr = PolyRegression(degree)
     fit = train_regular(lr, x, y, gaussian, epoch=1000, learning_rate=1e-2, verbose=False)
     res1 = fit(sortedx).detach().numpy().flatten() - sortedy.numpy().flatten()
     data = dict()
     data['model'] = 'LR+' + str(degree)
-    data['likelihood'] = gaussian.loglikelihood(res1)
+    data['MAE'] = (np.abs(res1)).mean()
     stats.append(data)
 
-    # robust linear regression
     lr = PolyRegression(degree)
     fit = train_regular(lr, x, y, laplace, epoch=1000, learning_rate=1e-2, verbose=False)
     res1 = fit(sortedx).detach().numpy().flatten() - sortedy.numpy().flatten()
     data = dict()
     data['model'] = 'RobustLR+' + str(degree)
-    data['likelihood'] = laplace.loglikelihood(res1)
+    data['MAE'] = (np.abs(res1)).mean()
     stats.append(data)
 
     # adaptive linear regression
@@ -97,13 +97,13 @@ def run_experiment(trX,trY, teX, teY, degree=2):
     res = fit(sortedx).view(-1) - sortedy
     data = dict()
     data['model'] = 'Adaptive+' + str(degree)
-    data['likelihood'] = adaptive.loglikelihood(res, alpha, scale)
+    data['MAE'] = (np.abs(res.detach())).mean().numpy()
     stats.append(data)
 
     # locally adaptive linear regression
     lr = PolyRegression(degree)
-    alpha_model = PolyRegression(2, init_zeros=True)
-    scale_model = PolyRegression(2, init_zeros=True)
+    alpha_model = PolyRegression(degree2, init_zeros=True)
+    scale_model = PolyRegression(degree2, init_zeros=True)
     fit, alpha_reg, scale_reg = train_locally_adaptive(lr, alpha_model, scale_model, x, y,
                                                        epoch=1000, learning_rate=1e-2, verbose=False)
     res = fit(sortedx).view(-1) - sortedy
@@ -112,7 +112,7 @@ def run_experiment(trX,trY, teX, teY, degree=2):
 
     data = dict()
     data['model'] = 'LocalAdaptive+' + str(degree)
-    data['likelihood'] = adaptive.loglikelihood(res, alphas, scales)
+    data['MAE'] = (np.abs(res.detach())).mean().numpy()
     stats.append(data)
 
     # gaussian process regression
@@ -139,41 +139,78 @@ def run_experiment(trX,trY, teX, teY, degree=2):
     # the source code divides mll by the size of input -> reconstruct mll
     data = dict()
     data['model'] = 'GPR'
-    data['likelihood'] = (mll(observed_pred, sortedy) * len(sortedy)).detach().numpy()
+    res = observed_pred.mean.detach().numpy().flatten() - sortedy.detach().numpy().flatten()
+    data['MAE'] = (np.abs(res)).mean()
+    stats.append(data)
+
+    ml = ModalLinearRegression(kernel="gaussian", poly=degree, bandwidth=1)
+    ml.fit(x.numpy().reshape(len(x), -1), y.numpy().reshape(-1))
+    yml = ml.predict(sortedx.detach().numpy().reshape(len(sortedx), -1))
+    data = dict()
+    data['model'] = 'Modal'
+    res = yml.flatten() - sortedy.detach().numpy().flatten()
+    data['MAE'] = (np.abs(res)).mean()
     stats.append(data)
 
     return pd.DataFrame(stats)
 
 
 if __name__ == '__main__':
-    n = 1000
-    output_func = polynomial_outcome
-    noise_func = indep_noise
-    n_name = ['Indep', 'Linear', 'Exp', 'Uni', 'Bi', 'Tri']
-    n_name = ['Uni']
-    noise = [indep_noise, linear_noise, exp_noise, unimodal_noise, bimodal_noise, trimodal_noise]
-    noise = [unimodal_noise]
+    X = pd.read_csv('dataset/lidar.tsv', sep='  ', engine='python')
+    x_range = X['range']
+    y_ratio = X['logratio']
+    x_range = np.array((x_range - np.mean(x_range)) / np.std(x_range))
+    y_ratio = np.array((y_ratio - np.mean(y_ratio)) / np.std(y_ratio))
 
-    Y_name = ['Poly', 'Sin']
-    output = [polynomial_outcome, sinusoidal_outcome]
-    for i in range(len(Y_name)):
-        for j in range(len(n_name)):
-            dfs = []
-            dfs_o = []
-            for r in range(5):
-                trX, trY, teX, teY = generate_data_function(output[i], noise[j], n, rate=0.1, loc=[-2], yloc=[10])
-                if i == 0:
-                    degree = 2
-                else:
-                    degree = 5
-                df = run_experiment(trX, trY, teX, teY, degree)
-                df['rep'] = r
-                dfs_o.append(df)
+    x_out1 = np.random.uniform(low=-0.8, high=-0.5, size=(20,))
+    y_out1 = np.random.uniform(low=-1.5, high=-1, size=(20,))
+    x_out2 = np.random.uniform(low=1, high=1.5, size=(6,))
+    y_out2 = np.random.uniform(low=0.5, high=1, size=(6,))
 
-                trX, trY, teX, teY = generate_data_function(output[i], noise[j], n, rate=0.0, loc=[-2], yloc=[10])
-                df = run_experiment(trX, trY, teX, teY, degree)
-                df['rep'] = r
-                dfs.append(df)
+    x_range_out = np.concatenate((x_range, x_out1), axis=0)
+    x_range_out = np.concatenate((x_range_out, x_out2), axis=0)
+    y_ratio_out = np.concatenate((y_ratio, y_out1), axis=0)
+    y_ratio_out = np.concatenate((y_ratio_out, y_out2), axis=0)
 
-            pd.concat(dfs_o).to_csv('results/6_1/'+Y_name[i]+n_name[j]+'Outlier.csv')
-            pd.concat(dfs).to_csv('results/6_1/' + Y_name[i] + n_name[j] + '.csv')
+    idx = np.arange(len(x_range_out))
+    np.random.shuffle(idx)
+    x_range_out = x_range_out[idx]
+    y_ratio_out = y_ratio_out[idx]
+    kf = KFold(n_splits=5, shuffle=False)
+    X_train, X_test, y_train, y_test = train_test_split(x_range, y_ratio, test_size=0.2, random_state=10)
+    X_train = np.concatenate((X_train, x_out1), axis=0)
+    X_train = np.concatenate((X_train, x_out2), axis=0)
+
+    y_train = np.concatenate((y_train, y_out1), axis=0)
+    y_train = np.concatenate((y_train, y_out2), axis=0)
+    df = run_experiment(X_train, y_train, X_test, y_test, degree=4, degree2=2)
+    df.to_csv('results/6_5_2/LIDAEMAE.csv')
+
+    X = pd.read_csv('dataset/mcycle.csv')
+    x_range = X['times']
+    y_ratio = X['accel']
+    x_range = np.array((x_range - np.mean(x_range)) / np.std(x_range))
+    y_ratio = np.array((y_ratio - np.mean(y_ratio)) / np.std(y_ratio))
+
+    x_out1 = np.random.uniform(low=-1.5, high=-1, size=(4,))
+    y_out1 = np.random.uniform(low=-1, high=-1.4, size=(4,))
+    x_out2 = np.random.uniform(low=1.3, high=1.5, size=(5,))
+    y_out2 = np.random.uniform(low=-1, high=-1.5, size=(5,))
+
+    x_range_out = np.concatenate((x_range, x_out1), axis=0)
+    x_range_out = np.concatenate((x_range_out, x_out2), axis=0)
+    y_ratio_out = np.concatenate((y_ratio, y_out1), axis=0)
+    y_ratio_out = np.concatenate((y_ratio_out, y_out2), axis=0)
+
+    idx = np.arange(len(x_range_out))
+    np.random.shuffle(idx)
+    x_range_out = x_range_out[idx]
+    y_ratio_out = y_ratio_out[idx]
+    X_train, X_test, y_train, y_test = train_test_split(x_range, y_ratio, test_size=0.2, random_state=10)
+    X_train = np.concatenate((X_train, x_out1), axis=0)
+    X_train = np.concatenate((X_train, x_out2), axis=0)
+
+    y_train = np.concatenate((y_train, y_out1), axis=0)
+    y_train = np.concatenate((y_train, y_out2), axis=0)
+    df = run_experiment(X_train, y_train, X_test, y_test, degree=6, degree2=2)
+    df.to_csv('results/6_5_2/MotorMAE.csv')

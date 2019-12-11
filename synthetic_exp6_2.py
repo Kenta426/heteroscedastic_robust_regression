@@ -42,7 +42,7 @@ def exp_noise(x):
 
 
 def unimodal_noise(x):
-    return npr.normal(0, 0.5/(np.maximum(np.abs(x), 0.3)), len(x))
+    return npr.normal(0, 1.3/(np.maximum(np.abs(x), 0.3)), len(x))
 
 
 def bimodal_noise(x):

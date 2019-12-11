@@ -42,7 +42,7 @@ def exp_noise(x):
 
 
 def unimodal_noise(x):
-    return npr.normal(0, 0.5/(np.maximum(np.abs(x), 0.3)), len(x))
+    return npr.normal(0, 1.3/(np.maximum(np.abs(x), 0.3)), len(x))
 
 
 def bimodal_noise(x):
@@ -74,16 +74,16 @@ def run_experiment(trX,trY, teX, teY, degree=2, degree2=2):
     # linear regression
     stats = []
 
-    # robust linear regression
-    lr = PolyRegression(degree)
-    fit = train_regular(lr, x, y, gaussian, epoch=1000, learning_rate=1e-2, verbose=False)
-    res1 = fit(sortedx).detach().numpy().flatten() - sortedy.numpy().flatten()
-    data = dict()
-    data['model'] = 'LR+' + str(degree)
-    data['MSE'] = (res1 ** 2).mean()
-    data['MAE'] = (np.abs(res1)).mean()
-    data['likelihood'] = gaussian.loglikelihood(res1)
-    stats.append(data)
+    # # robust linear regression
+    # lr = PolyRegression(degree)
+    # fit = train_regular(lr, x, y, gaussian, epoch=1000, learning_rate=1e-2, verbose=False)
+    # res1 = fit(sortedx).detach().numpy().flatten() - sortedy.numpy().flatten()
+    # data = dict()
+    # data['model'] = 'LR+' + str(degree)
+    # data['MSE'] = (res1 ** 2).mean()
+    # data['MAE'] = (np.abs(res1)).mean()
+    # data['likelihood'] = gaussian.loglikelihood(res1)
+    # stats.append(data)
 
     # adaptive linear regression
     lr = PolyRegression(degree)
@@ -122,24 +122,31 @@ if __name__ == '__main__':
     n_name = ['Indep', 'Linear', 'Exp', 'Uni', 'Bi', 'Tri']
     noise = [indep_noise, linear_noise, exp_noise, unimodal_noise, bimodal_noise, trimodal_noise]
     Y_name = ['Poly']
-    output = [polynomial_outcome, sinusoidal_outcome]
-    for d in [1,2,3,4,5,6]:
+    output = [polynomial_outcome]
+    for d in [1,2,3,4,5,6,7,8,9,10]:
         for i in range(len(Y_name)):
             for j in range(len(n_name)):
-                df_n = []
                 df_b = []
                 for r in range(5):
-                    trX, trY, teX, teY = generate_data_function(output[i], noise[j], 1000, rate=0.1, loc=[-2], yloc=[10])
+                    trX, trY, _, _ = generate_data_function(output[i], noise[j], 1000, rate=0.1, loc=[-2], yloc=[10])
+                    teX, teY, _, _ = generate_data_function(output[i], noise[j], 200, rate=0.1, loc=[-2], yloc=[10])
 
                     df = run_experiment(trX, trY, teX, teY, degree=d)
                     df['rep'] = r
                     df_b.append(df)
+                print(Y_name[i] + n_name[j] + 'base' + str(d))
+                pd.concat(df_b).to_csv('results/6_4/' + Y_name[i] + n_name[j] + 'base' + str(d) + 'Outlier.csv')
 
-                    # if d < 4:
+    for d in [1,2,3,4,5,6,7,8,9,10]:
+        for i in range(len(Y_name)):
+            for j in range(len(n_name)):
+                df_n = []
+                for r in range(5):
+                    trX, trY, _, _ = generate_data_function(output[i], noise[j], 1000, rate=0.1, loc=[-2], yloc=[10])
+                    teX, teY, _, _ = generate_data_function(output[i], noise[j], 200, rate=0.1, loc=[-2], yloc=[10])
+
                     df = run_experiment(trX, trY, teX, teY, degree2=d)
                     df['rep'] = r
                     df_n.append(df)
-
-                pd.concat(df_b).to_csv('results/6_4/' + Y_name[i] + n_name[j] + 'base' + str(d) + 'Outlier.csv')
-                if len(df_n) != 0:
-                    pd.concat(df_n).to_csv('results/6_4/'+Y_name[i]+n_name[j]+'noise'+str(d)+'Outlier.csv')
+                print(Y_name[i] + n_name[j] + 'noise' + str(d))
+                pd.concat(df_n).to_csv('results/6_4/'+Y_name[i]+n_name[j]+'noise'+str(d)+'Outlier.csv')

@@ -14,6 +14,8 @@ from likelihood import Gaussian, Laplace, Adaptive
 from tqdm import tqdm
 import gpytorch
 import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold
 plt.style.use('ggplot')
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
@@ -68,17 +70,33 @@ def run_experiment(trX, trY, teX, teY, degree=2, degree2=2):
     sortedy = ty[idxX]
 
     adaptive = Adaptive()
+    gaussian = Gaussian()
+    laplace = Laplace()
 
     # linear regression
     stats = []
+    lr = PolyRegression(degree)
+    fit = train_regular(lr, x, y, gaussian, epoch=1000, learning_rate=1e-2, verbose=False)
+    res1 = fit(sortedx).detach().numpy().flatten() - sortedy.numpy().flatten()
+    data = dict()
+    data['model'] = 'LR+' + str(degree)
+    data['likelihood'] = gaussian.loglikelihood(res1)
+    stats.append(data)
+
+    lr = PolyRegression(degree)
+    fit = train_regular(lr, x, y, laplace, epoch=1000, learning_rate=1e-2, verbose=False)
+    res1 = fit(sortedx).detach().numpy().flatten() - sortedy.numpy().flatten()
+    data = dict()
+    data['model'] = 'RobustLR+' + str(degree)
+    data['likelihood'] = laplace.loglikelihood(res1)
+    stats.append(data)
+
     # adaptive linear regression
     lr = PolyRegression(degree)
-    fit, alpha, scale = train_adaptive(lr, x, y, epoch=100, learning_rate=1e-2, verbose=False)
+    fit, alpha, scale = train_adaptive(lr, x, y, epoch=1000, learning_rate=1e-2, verbose=False)
     res = fit(sortedx).view(-1) - sortedy
     data = dict()
     data['model'] = 'Adaptive+' + str(degree)
-    data['MSE'] = (res**2).mean().detach().numpy().flatten()[0]
-    data['MAE'] = (np.abs(res.detach().numpy())).mean().flatten()[0]
     data['likelihood'] = adaptive.loglikelihood(res, alpha, scale)
     stats.append(data)
 
@@ -87,16 +105,41 @@ def run_experiment(trX, trY, teX, teY, degree=2, degree2=2):
     alpha_model = PolyRegression(degree2, init_zeros=True)
     scale_model = PolyRegression(degree2, init_zeros=True)
     fit, alpha_reg, scale_reg = train_locally_adaptive(lr, alpha_model, scale_model, x, y,
-                                                       epoch=200, learning_rate=1e-2, verbose=False)
+                                                       epoch=1000, learning_rate=1e-2, verbose=False)
     res = fit(sortedx).view(-1) - sortedy
     alphas = torch.exp(alpha_reg(sortedx).view(-1))
     scales = torch.exp(scale_reg(sortedx).view(-1))
 
     data = dict()
     data['model'] = 'LocalAdaptive+' + str(degree)
-    data['MSE'] = (res ** 2).mean().detach().numpy().flatten()[0]
-    data['MAE'] = (np.abs(res.detach().numpy())).mean().flatten()[0]
     data['likelihood'] = adaptive.loglikelihood(res, alphas, scales)
+    stats.append(data)
+
+    # gaussian process regression
+    likelihood = gpytorch.likelihoods.GaussianLikelihood()
+    model = ExactGPModel(x, y, likelihood)
+
+    model.train()
+    likelihood.train()
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
+    mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+    training_iter = 100
+    for _ in tqdm(range(training_iter)):
+        optimizer.zero_grad()
+        output = model(x)
+        loss = -mll(output, y)
+        loss.backward()
+        optimizer.step()
+
+    model.eval()
+    likelihood.eval()
+    with torch.no_grad(), gpytorch.settings.fast_pred_var():
+        observed_pred = likelihood(model(sortedx))
+    # the source code divides mll by the size of input -> reconstruct mll
+    data = dict()
+    data['model'] = 'GPR'
+    data['likelihood'] = (mll(observed_pred, sortedy) * len(sortedy)).detach().numpy()
     stats.append(data)
 
     return pd.DataFrame(stats)
@@ -106,7 +149,6 @@ if __name__ == '__main__':
     X = pd.read_csv('dataset/lidar.tsv', sep='  ', engine='python')
     x_range = X['range']
     y_ratio = X['logratio']
-
     x_range = np.array((x_range - np.mean(x_range)) / np.std(x_range))
     y_ratio = np.array((y_ratio - np.mean(y_ratio)) / np.std(y_ratio))
 
@@ -120,34 +162,38 @@ if __name__ == '__main__':
     y_ratio_out = np.concatenate((y_ratio, y_out1), axis=0)
     y_ratio_out = np.concatenate((y_ratio_out, y_out2), axis=0)
 
-    trX = x_range_out
-    trY = y_ratio_out
+    idx = np.arange(len(x_range_out))
+    np.random.shuffle(idx)
+    x_range_out = x_range_out[idx]
+    y_ratio_out = y_ratio_out[idx]
+    kf = KFold(n_splits=5, shuffle=False)
+    dfs = []
 
-    df = run_experiment(trX, trY, trX, trY, degree=4, degree2=3)
-    print(df)
-    # output_func = polynomial_outcome
-    # noise_func = indep_noise
-    # n_name = ['Indep', 'Linear', 'Exp', 'Uni', 'Bi', 'Tri']
-    # noise = [indep_noise, linear_noise, exp_noise, unimodal_noise, bimodal_noise, trimodal_noise]
-    # Y_name = ['Poly']
-    # output = [polynomial_outcome, sinusoidal_outcome]
-    # for d in [1,2,3,4,5,6]:
-    #     for i in range(len(Y_name)):
-    #         for j in range(len(n_name)):
-    #             df_n = []
-    #             df_b = []
-    #             for r in range(5):
-    #                 trX, trY, teX, teY = generate_data_function(output[i], noise[j], 1000, rate=0.1, loc=[-2], yloc=[10])
-    #
-    #                 df = run_experiment(trX, trY, teX, teY, degree=d)
-    #                 df['rep'] = r
-    #                 df_b.append(df)
-    #
-    #                 if d < 4:
-    #                     df = run_experiment(trX, trY, teX, teY, degree2=d)
-    #                     df['rep'] = r
-    #                     df_n.append(df)
-    #
-    #             pd.concat(df_b).to_csv('results/6_4/' + Y_name[i] + n_name[j] + 'base' + str(d) + 'Outlier.csv')
-    #             if len(df_n) != 0:
-    #                 pd.concat(df_n).to_csv('results/6_4/'+Y_name[i]+n_name[j]+'noise'+str(d)+'Outlier.csv')
+    X_train, X_test, y_train, y_test = train_test_split(x_range_out, y_ratio_out, test_size=0.2, random_state=42)
+    df = run_experiment(X_train, y_train, X_test, y_test, degree=4, degree2=2)
+    dfs.append(df)
+    df.to_csv('results/6_5/LIDARLikelihood.csv')
+
+    X = pd.read_csv('dataset/mcycle.csv')
+    x_range = X['times']
+    y_ratio = X['accel']
+    x_range = np.array((x_range - np.mean(x_range)) / np.std(x_range))
+    y_ratio = np.array((y_ratio - np.mean(y_ratio)) / np.std(y_ratio))
+
+    x_out1 = np.random.uniform(low=-1.5, high=-1, size=(4,))
+    y_out1 = np.random.uniform(low=-1, high=-1.4, size=(4,))
+    x_out2 = np.random.uniform(low=1.3, high=1.5, size=(5,))
+    y_out2 = np.random.uniform(low=-1, high=-1.5, size=(5,))
+
+    x_range_out = np.concatenate((x_range, x_out1), axis=0)
+    x_range_out = np.concatenate((x_range_out, x_out2), axis=0)
+    y_ratio_out = np.concatenate((y_ratio, y_out1), axis=0)
+    y_ratio_out = np.concatenate((y_ratio_out, y_out2), axis=0)
+
+    idx = np.arange(len(x_range_out))
+    np.random.shuffle(idx)
+    x_range_out = x_range_out[idx]
+    y_ratio_out = y_ratio_out[idx]
+    X_train, X_test, y_train, y_test = train_test_split(x_range_out, y_ratio_out, test_size=0.2, random_state=42)
+    df = run_experiment(X_train, y_train, X_test, y_test, degree=6, degree2=3)
+    df.to_csv('results/6_5/MotorLikelihood.csv')
