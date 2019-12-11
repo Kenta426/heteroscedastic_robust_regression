@@ -54,7 +54,7 @@ def train_locally_adaptive(model, alpha, scale, trX, trY, learning_rate=0.01, ep
         alphas = torch.exp(alpha(trX))
         scales = torch.exp(scale(trX))
         loss = general.lossfun((y_hat - trY)[:, None], alpha=alphas, scale=scales, approximate=False)
-
+        scales = scales + 1e-10
         log_partition = torch.log(scales) + dist.log_base_partition_function(alphas)
 
         loss = (loss + log_partition).mean()
