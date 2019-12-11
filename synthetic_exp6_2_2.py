@@ -67,33 +67,47 @@ def run_experiment(trX,trY, teX, teY, degree=2):
     sortedx, idxX = torch.sort(tx)
     sortedy = ty[idxX]
 
+    gaussian = Gaussian()
     laplace = Laplace()
     adaptive = Adaptive()
-    gaussian = Gaussian()
-
     # linear regression
     stats = []
 
-    # robust linear regression
     lr = PolyRegression(degree)
-    fit = train_regular(lr, x, y, gaussian, epoch=300, learning_rate=1e-2, verbose=False)
-    res1 = fit(sortedx).detach().numpy().flatten() - sortedy.numpy().flatten()
+    fit = train_regular(lr, x, y, gaussian, epoch=100, learning_rate=1e-2, verbose=False)
     data = dict()
     data['model'] = 'LR+' + str(degree)
-    data['MSE'] = (res1 ** 2).mean()
-    data['MAE'] = (np.abs(res1)).mean()
-    data['likelihood'] = gaussian.loglikelihood(res1)
+    param = fit.beta.weight.data.numpy().flatten()
+    bias = fit.beta.bias.data.numpy().flatten()
+    data['param0'] = param[0]
+    data['param1'] = param[1]
+    data['param2'] = bias[0]
+
+    stats.append(data)
+
+    # robust linear regression
+    lr = PolyRegression(degree)
+    fit = train_regular(lr, x, y, laplace, epoch=100, learning_rate=1e-2, verbose=False)
+    data = dict()
+    data['model'] = 'RobustLR+' + str(degree)
+    param = fit.beta.weight.data.numpy().flatten()
+    bias = fit.beta.bias.data.numpy().flatten()
+    data['param0'] = param[0]
+    data['param1'] = param[1]
+    data['param2'] = bias[0]
+
     stats.append(data)
 
     # adaptive linear regression
     lr = PolyRegression(degree)
-    fit, alpha, scale = train_adaptive(lr, x, y, epoch=300, learning_rate=1e-2, verbose=False)
-    res = fit(sortedx).view(-1) - sortedy
+    fit, alpha, scale = train_adaptive(lr, x, y, epoch=100, learning_rate=1e-2, verbose=False)
     data = dict()
     data['model'] = 'Adaptive+' + str(degree)
-    data['MSE'] = (res**2).mean().detach().numpy().flatten()[0]
-    data['MAE'] = (np.abs(res.detach().numpy())).mean().flatten()[0]
-    data['likelihood'] = adaptive.loglikelihood(res, alpha, scale)
+    param = fit.beta.weight.data.numpy().flatten()
+    bias = fit.beta.bias.data.numpy().flatten()
+    data['param0'] = param[0]
+    data['param1'] = param[1]
+    data['param2'] = bias[0]
     stats.append(data)
 
     # locally adaptive linear regression
@@ -101,37 +115,50 @@ def run_experiment(trX,trY, teX, teY, degree=2):
     alpha_model = PolyRegression(2, init_zeros=True)
     scale_model = PolyRegression(2, init_zeros=True)
     fit, alpha_reg, scale_reg = train_locally_adaptive(lr, alpha_model, scale_model, x, y,
-                                                       epoch=300, learning_rate=1e-2, verbose=False)
-    res = fit(sortedx).view(-1) - sortedy
-    alphas = torch.exp(alpha_reg(sortedx).view(-1))
-    scales = torch.exp(scale_reg(sortedx).view(-1))
-
+                                                       epoch=500, learning_rate=1e-2, verbose=False)
     data = dict()
     data['model'] = 'LocalAdaptive+' + str(degree)
-    data['MSE'] = (res ** 2).mean().detach().numpy().flatten()[0]
-    data['MAE'] = (np.abs(res.detach().numpy())).mean().flatten()[0]
-    data['likelihood'] = adaptive.loglikelihood(res, alphas, scales)
+    param = fit.beta.weight.data.numpy().flatten()
+    bias = fit.beta.bias.data.numpy().flatten()
+    data['param0'] = param[0]
+    data['param1'] = param[1]
+    data['param2'] = bias[0]
+    stats.append(data)
+
+    # modal regression
+    ml = ModalLinearRegression(kernel="gaussian", poly=degree, bandwidth=1)
+    ml.fit(x.numpy().reshape(len(x), -1), y.numpy().reshape(-1))
+    yml = ml.predict(sortedx.detach().numpy().reshape(len(sortedx), -1))
+    data = dict()
+    data['model'] = 'Modal'
+    param = ml.coef_.flatten()
+    bias = ml.intercept_.flatten()
+    data['param0'] = param[0]
+    data['param1'] = param[1]
+    data['param2'] = bias[0]
     stats.append(data)
 
     return pd.DataFrame(stats)
 
 
 if __name__ == '__main__':
+    n = 1000
     output_func = polynomial_outcome
     noise_func = indep_noise
     n_name = ['Indep', 'Linear', 'Exp', 'Uni', 'Bi', 'Tri']
     noise = [indep_noise, linear_noise, exp_noise, unimodal_noise, bimodal_noise, trimodal_noise]
     Y_name = ['Poly']
     output = [polynomial_outcome, sinusoidal_outcome]
-    for n in [50, 100, 300, 500, 1000, 3000, 5000, 10000]:
-        for i in range(len(Y_name)):
-            for j in range(len(n_name)):
-                dfs = []
-                for r in range(5):
-                    trX, trY, _, _ = generate_data_function(output[i], noise[j], n, rate=0.1, loc=[-2], yloc=[10])
-                    _, _, teX, teY = generate_data_function(output[i], noise[j], 500, rate=0.1, loc=[-2], yloc=[10])
-
-                    df = run_experiment(trX, trY, teX, teY, 2)
-                    df['rep'] = r
-                    dfs.append(df)
-                pd.concat(dfs).to_csv('results/6_3/'+Y_name[i]+n_name[j]+str(n)+'Outlier.csv')
+    for i in range(len(Y_name)):
+        for j in range(len(n_name)):
+            dfs = []
+            for k in range(5):
+                trX, trY, teX, teY = generate_data_function(output[i], noise[j], n, rate=0.1, loc=[-2], yloc=[10])
+                if i == 0:
+                    degree = 2
+                else:
+                    degree = 5
+                df = run_experiment(trX, trY, teX, teY, degree)
+                df['rep'] = k
+                dfs.append(df)
+            pd.concat(dfs).to_csv('results/6_2_2/'+Y_name[i]+n_name[j]+'Outlier.csv')

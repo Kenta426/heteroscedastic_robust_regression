@@ -61,33 +61,19 @@ def sinusoidal_outcome(X):
     return 1 / 5 * X ** 2 + 2 * np.sin(2 * X) - 0.5 * X
 
 
-def run_experiment(trX,trY, teX, teY, degree=2):
+def run_experiment(trX, trY, teX, teY, degree=2, degree2=2):
     x, y = torch.Tensor(trX), torch.Tensor(trY)
     tx, ty = torch.Tensor(teX), torch.Tensor(teY)
     sortedx, idxX = torch.sort(tx)
     sortedy = ty[idxX]
 
-    laplace = Laplace()
     adaptive = Adaptive()
-    gaussian = Gaussian()
 
     # linear regression
     stats = []
-
-    # robust linear regression
-    lr = PolyRegression(degree)
-    fit = train_regular(lr, x, y, gaussian, epoch=300, learning_rate=1e-2, verbose=False)
-    res1 = fit(sortedx).detach().numpy().flatten() - sortedy.numpy().flatten()
-    data = dict()
-    data['model'] = 'LR+' + str(degree)
-    data['MSE'] = (res1 ** 2).mean()
-    data['MAE'] = (np.abs(res1)).mean()
-    data['likelihood'] = gaussian.loglikelihood(res1)
-    stats.append(data)
-
     # adaptive linear regression
     lr = PolyRegression(degree)
-    fit, alpha, scale = train_adaptive(lr, x, y, epoch=300, learning_rate=1e-2, verbose=False)
+    fit, alpha, scale = train_adaptive(lr, x, y, epoch=100, learning_rate=1e-2, verbose=False)
     res = fit(sortedx).view(-1) - sortedy
     data = dict()
     data['model'] = 'Adaptive+' + str(degree)
@@ -98,10 +84,10 @@ def run_experiment(trX,trY, teX, teY, degree=2):
 
     # locally adaptive linear regression
     lr = PolyRegression(degree)
-    alpha_model = PolyRegression(2, init_zeros=True)
-    scale_model = PolyRegression(2, init_zeros=True)
+    alpha_model = PolyRegression(degree2, init_zeros=True)
+    scale_model = PolyRegression(degree2, init_zeros=True)
     fit, alpha_reg, scale_reg = train_locally_adaptive(lr, alpha_model, scale_model, x, y,
-                                                       epoch=300, learning_rate=1e-2, verbose=False)
+                                                       epoch=200, learning_rate=1e-2, verbose=False)
     res = fit(sortedx).view(-1) - sortedy
     alphas = torch.exp(alpha_reg(sortedx).view(-1))
     scales = torch.exp(scale_reg(sortedx).view(-1))
@@ -117,21 +103,51 @@ def run_experiment(trX,trY, teX, teY, degree=2):
 
 
 if __name__ == '__main__':
-    output_func = polynomial_outcome
-    noise_func = indep_noise
-    n_name = ['Indep', 'Linear', 'Exp', 'Uni', 'Bi', 'Tri']
-    noise = [indep_noise, linear_noise, exp_noise, unimodal_noise, bimodal_noise, trimodal_noise]
-    Y_name = ['Poly']
-    output = [polynomial_outcome, sinusoidal_outcome]
-    for n in [50, 100, 300, 500, 1000, 3000, 5000, 10000]:
-        for i in range(len(Y_name)):
-            for j in range(len(n_name)):
-                dfs = []
-                for r in range(5):
-                    trX, trY, _, _ = generate_data_function(output[i], noise[j], n, rate=0.1, loc=[-2], yloc=[10])
-                    _, _, teX, teY = generate_data_function(output[i], noise[j], 500, rate=0.1, loc=[-2], yloc=[10])
+    X = pd.read_csv('dataset/lidar.tsv', sep='  ', engine='python')
+    x_range = X['range']
+    y_ratio = X['logratio']
 
-                    df = run_experiment(trX, trY, teX, teY, 2)
-                    df['rep'] = r
-                    dfs.append(df)
-                pd.concat(dfs).to_csv('results/6_3/'+Y_name[i]+n_name[j]+str(n)+'Outlier.csv')
+    x_range = np.array((x_range - np.mean(x_range)) / np.std(x_range))
+    y_ratio = np.array((y_ratio - np.mean(y_ratio)) / np.std(y_ratio))
+
+    x_out1 = np.random.uniform(low=-0.8, high=-0.5, size=(20,))
+    y_out1 = np.random.uniform(low=-1.5, high=-1, size=(20,))
+    x_out2 = np.random.uniform(low=1, high=1.5, size=(6,))
+    y_out2 = np.random.uniform(low=0.5, high=1, size=(6,))
+
+    x_range_out = np.concatenate((x_range, x_out1), axis=0)
+    x_range_out = np.concatenate((x_range_out, x_out2), axis=0)
+    y_ratio_out = np.concatenate((y_ratio, y_out1), axis=0)
+    y_ratio_out = np.concatenate((y_ratio_out, y_out2), axis=0)
+
+    trX = x_range_out
+    trY = y_ratio_out
+
+    df = run_experiment(trX, trY, trX, trY, degree=4, degree2=3)
+    print(df)
+    # output_func = polynomial_outcome
+    # noise_func = indep_noise
+    # n_name = ['Indep', 'Linear', 'Exp', 'Uni', 'Bi', 'Tri']
+    # noise = [indep_noise, linear_noise, exp_noise, unimodal_noise, bimodal_noise, trimodal_noise]
+    # Y_name = ['Poly']
+    # output = [polynomial_outcome, sinusoidal_outcome]
+    # for d in [1,2,3,4,5,6]:
+    #     for i in range(len(Y_name)):
+    #         for j in range(len(n_name)):
+    #             df_n = []
+    #             df_b = []
+    #             for r in range(5):
+    #                 trX, trY, teX, teY = generate_data_function(output[i], noise[j], 1000, rate=0.1, loc=[-2], yloc=[10])
+    #
+    #                 df = run_experiment(trX, trY, teX, teY, degree=d)
+    #                 df['rep'] = r
+    #                 df_b.append(df)
+    #
+    #                 if d < 4:
+    #                     df = run_experiment(trX, trY, teX, teY, degree2=d)
+    #                     df['rep'] = r
+    #                     df_n.append(df)
+    #
+    #             pd.concat(df_b).to_csv('results/6_4/' + Y_name[i] + n_name[j] + 'base' + str(d) + 'Outlier.csv')
+    #             if len(df_n) != 0:
+    #                 pd.concat(df_n).to_csv('results/6_4/'+Y_name[i]+n_name[j]+'noise'+str(d)+'Outlier.csv')

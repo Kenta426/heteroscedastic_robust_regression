@@ -65,3 +65,20 @@ def train_locally_adaptive(model, alpha, scale, trX, trY, learning_rate=0.01, ep
         if verbose and np.mod(e, 100) == 0:
             print('{:<4}: loss={:03f}'.format(e, loss.data))
     return model, alpha, scale
+
+
+def train_pre_trained_adaptive(model, alphas, scales, trX, trY, learning_rate=0.01, epoch=500, verbose=True):
+    params = list(model.parameters())
+    optimizer = torch.optim.Adam(params, lr=learning_rate, weight_decay=0.01)
+
+    for e in tqdm(range(epoch)):
+        y_hat = model(trX).view(-1)
+        loss = torch.mean(robust_loss_pytorch.general.lossfun(
+            y_hat - trY, alpha=alphas, scale=scales))
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        if verbose and np.mod(e, 100) == 0:
+            print('{:<4}: loss={:03f}'.format(e, loss.data))
+    return model
