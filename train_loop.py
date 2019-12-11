@@ -74,7 +74,7 @@ def train_pre_trained_adaptive(model, alphas, scales, trX, trY, learning_rate=0.
     for e in tqdm(range(epoch)):
         y_hat = model(trX).view(-1)
         loss = torch.mean(robust_loss_pytorch.general.lossfun(
-            y_hat - trY, alpha=alphas, scale=scales))
+            y_hat - trY.view(-1), alpha=alphas, scale=scales))
 
         optimizer.zero_grad()
         loss.backward()

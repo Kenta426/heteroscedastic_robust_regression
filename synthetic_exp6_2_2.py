@@ -145,7 +145,8 @@ if __name__ == '__main__':
     n = 1000
     output_func = polynomial_outcome
     noise_func = indep_noise
-    n_name = ['Indep', 'Linear', 'Exp', 'Uni', 'Bi', 'Tri']
+    n_name = ['Tri']
+    # n_name = ['Indep', 'Linear', 'Exp', 'Uni', 'Bi', 'Tri']
     noise = [indep_noise, linear_noise, exp_noise, unimodal_noise, bimodal_noise, trimodal_noise]
     Y_name = ['Poly']
     output = [polynomial_outcome, sinusoidal_outcome]

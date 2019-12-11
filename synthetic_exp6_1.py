@@ -75,7 +75,7 @@ def run_experiment(trX,trY, teX, teY, degree=2):
     stats = []
 
     lr = PolyRegression(degree)
-    fit = train_regular(lr, x, y, gaussian, epoch=100, learning_rate=1e-2, verbose=False)
+    fit = train_regular(lr, x, y, gaussian, epoch=1000, learning_rate=1e-2, verbose=False)
     res1 = fit(sortedx).detach().numpy().flatten() - sortedy.numpy().flatten()
     data = dict()
     data['model'] = 'LR+' + str(degree)
@@ -84,7 +84,7 @@ def run_experiment(trX,trY, teX, teY, degree=2):
 
     # robust linear regression
     lr = PolyRegression(degree)
-    fit = train_regular(lr, x, y, laplace, epoch=100, learning_rate=1e-2, verbose=False)
+    fit = train_regular(lr, x, y, laplace, epoch=1000, learning_rate=1e-2, verbose=False)
     res1 = fit(sortedx).detach().numpy().flatten() - sortedy.numpy().flatten()
     data = dict()
     data['model'] = 'RobustLR+' + str(degree)
@@ -93,7 +93,7 @@ def run_experiment(trX,trY, teX, teY, degree=2):
 
     # adaptive linear regression
     lr = PolyRegression(degree)
-    fit, alpha, scale = train_adaptive(lr, x, y, epoch=100, learning_rate=1e-2, verbose=False)
+    fit, alpha, scale = train_adaptive(lr, x, y, epoch=1000, learning_rate=1e-2, verbose=False)
     res = fit(sortedx).view(-1) - sortedy
     data = dict()
     data['model'] = 'Adaptive+' + str(degree)
@@ -105,7 +105,7 @@ def run_experiment(trX,trY, teX, teY, degree=2):
     alpha_model = PolyRegression(2, init_zeros=True)
     scale_model = PolyRegression(2, init_zeros=True)
     fit, alpha_reg, scale_reg = train_locally_adaptive(lr, alpha_model, scale_model, x, y,
-                                                       epoch=200, learning_rate=1e-2, verbose=False)
+                                                       epoch=1000, learning_rate=1e-2, verbose=False)
     res = fit(sortedx).view(-1) - sortedy
     alphas = torch.exp(alpha_reg(sortedx).view(-1))
     scales = torch.exp(scale_reg(sortedx).view(-1))

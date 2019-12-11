@@ -75,19 +75,19 @@ def run_experiment(trX,trY, teX, teY, degree=2):
     stats = []
 
     # robust linear regression
-    lr = PolyRegression(degree)
-    fit = train_regular(lr, x, y, gaussian, epoch=300, learning_rate=1e-2, verbose=False)
-    res1 = fit(sortedx).detach().numpy().flatten() - sortedy.numpy().flatten()
-    data = dict()
-    data['model'] = 'LR+' + str(degree)
-    data['MSE'] = (res1 ** 2).mean()
-    data['MAE'] = (np.abs(res1)).mean()
-    data['likelihood'] = gaussian.loglikelihood(res1)
-    stats.append(data)
+    # lr = PolyRegression(degree)
+    # fit = train_regular(lr, x, y, gaussian, epoch=1000, learning_rate=1e-2, verbose=False)
+    # res1 = fit(sortedx).detach().numpy().flatten() - sortedy.numpy().flatten()
+    # data = dict()
+    # data['model'] = 'LR+' + str(degree)
+    # data['MSE'] = (res1 ** 2).mean()
+    # data['MAE'] = (np.abs(res1)).mean()
+    # data['likelihood'] = gaussian.loglikelihood(res1)
+    # stats.append(data)
 
     # adaptive linear regression
     lr = PolyRegression(degree)
-    fit, alpha, scale = train_adaptive(lr, x, y, epoch=300, learning_rate=1e-2, verbose=False)
+    fit, alpha, scale = train_adaptive(lr, x, y, epoch=1000, learning_rate=1e-2, verbose=False)
     res = fit(sortedx).view(-1) - sortedy
     data = dict()
     data['model'] = 'Adaptive+' + str(degree)
@@ -101,7 +101,7 @@ def run_experiment(trX,trY, teX, teY, degree=2):
     alpha_model = PolyRegression(2, init_zeros=True)
     scale_model = PolyRegression(2, init_zeros=True)
     fit, alpha_reg, scale_reg = train_locally_adaptive(lr, alpha_model, scale_model, x, y,
-                                                       epoch=300, learning_rate=1e-2, verbose=False)
+                                                       epoch=1000, learning_rate=1e-2, verbose=False)
     res = fit(sortedx).view(-1) - sortedy
     alphas = torch.exp(alpha_reg(sortedx).view(-1))
     scales = torch.exp(scale_reg(sortedx).view(-1))
@@ -129,9 +129,10 @@ if __name__ == '__main__':
                 dfs = []
                 for r in range(5):
                     trX, trY, _, _ = generate_data_function(output[i], noise[j], n, rate=0.1, loc=[-2], yloc=[10])
-                    _, _, teX, teY = generate_data_function(output[i], noise[j], 500, rate=0.1, loc=[-2], yloc=[10])
+                    teX, teY, _, _ = generate_data_function(output[i], noise[j], 500, rate=0.1, loc=[-2], yloc=[10])
 
                     df = run_experiment(trX, trY, teX, teY, 2)
                     df['rep'] = r
                     dfs.append(df)
+                print(Y_name[i], n_name[j], 'done')
                 pd.concat(dfs).to_csv('results/6_3/'+Y_name[i]+n_name[j]+str(n)+'Outlier.csv')
