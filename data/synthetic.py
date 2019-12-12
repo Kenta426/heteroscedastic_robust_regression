@@ -100,7 +100,7 @@ def generate_data_function(base_func, noise_func, n, test_data = 0.2, rate=0.01,
     Xout = []
     Yout = []
     for l, yl in zip(loc, yloc):
-        out_data = npr.multivariate_normal([0,0], [[0.03,0],[0,0.5]], out)
+        out_data = npr.multivariate_normal([0,0], [[1,0],[0,1]], out)
         out_x = out_data[:, 0]+l
         out_y = out_data[:, 1]+yl
         Xout.append(out_x)
@@ -109,6 +109,12 @@ def generate_data_function(base_func, noise_func, n, test_data = 0.2, rate=0.01,
     Yout = np.hstack(Yout)
     trainX = np.hstack([trainX, Xout])
     trainY = np.hstack([trainY, Yout])
+
+    trainX = (trainX-trainX.mean())/trainX.std()
+    trainY = (trainY-trainY.mean())/trainY.std()
+    testX = (testX-testX.mean())/testX.std()
+    testY = (testY-testY.mean())/testY.std()
+
     return trainX, trainY, testX, testY
 
 
